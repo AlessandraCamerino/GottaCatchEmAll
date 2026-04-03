@@ -195,3 +195,5 @@ The test suite includes:
 
 ### .NET version
 - For a long-lived production service, target **.NET 8 (LTS)** instead of .NET 9. .NET 8 is supported until November 2026; .NET 9 reaches end of life in May 2026.
+
+Ps: Git History absent, but you can find the workflow in the file DECISIONS.txt - where there's the chat with Claude Code :-)
