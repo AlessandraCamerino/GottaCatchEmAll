@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Exposes internal types (IPokeApiClient, PokeApiSpeciesResponse, etc.) to the test project.
+      Design decision: we use InternalsVisibleTo rather than making these types public,
+      because they are implementation details that should not be part of the public API surface.
+      Only the test assembly gets access — no production consumer is affected.
+    -->
+    <InternalsVisibleTo Include="Pokedex.Tests" />
+    <!--
+      NSubstitute uses Castle DynamicProxy to generate proxy classes at runtime.
+      Castle creates those proxies in a dynamic assembly named "DynamicProxyGenAssembly2".
+      Without this, NSubstitute cannot create substitutes for internal interfaces.
+    -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.4" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.13.18" />
+  </ItemGroup>
+
+</Project>

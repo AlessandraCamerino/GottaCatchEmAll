@@ -1,0 +1,13 @@
+# Exclude local build artifacts — these are regenerated inside the container during build.
+# Without this, the local obj/ directory would overwrite the restored NuGet packages
+# from the previous Docker layer, causing "package not found" errors at publish time.
+**/bin/
+**/obj/
+
+# Exclude test project — not needed in the production image
+tests/
+
+# Exclude local dev files
+**/.vs/
+**/.vscode/
+*.user

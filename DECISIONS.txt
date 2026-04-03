@@ -1,0 +1,141 @@
+Pokédex API — Decision Log
+Author: Alessandra
+Format: chat log with Claude Code
+
+════════════════════════════════════════════════════════════════════════════════
+
+STACK E STRUTTURA
+════════════════════════════════════════════════════════════════════════════════
+
+Alessandra: Usiamo .NET 9. Solution con 2 progetti: Pokedex.Api e Pokedex.Tests.
+            Non voglio over-engineering — Clean Architecture con Domain/Application/
+            Infrastructure sarebbe troppo per 2 endpoint. Separo i concern dentro
+            il progetto API con cartelle: Controllers, Services, HttpClients.
+            La logica sta nel service layer, i controller restano thin.
+
+Claude Code: Concordo. Due progetti è la scelta giusta qui.
+
+════════════════════════════════════════════════════════════════════════════════
+
+API STYLE
+════════════════════════════════════════════════════════════════════════════════
+
+Alessandra: Uso i Controllers, non Minimal API. Con un team che legge il codice
+            è più convenzionale e leggibile.
+
+Claude Code: Scelta giusta. Minimal API ha senso per microservizi ultra-leggeri
+             o endpoint singoli — qui non aggiunge nulla.
+
+════════════════════════════════════════════════════════════════════════════════
+
+LIBRERIE DI TEST
+════════════════════════════════════════════════════════════════════════════════
+
+Alessandra: Per i test: xUnit, FluentAssertions, NSubstitute.
+
+Claude Code: Buone scelte. Vale la pena notare che Moq ha avuto una controversia
+             sulla telemetria nel 2023 — NSubstitute è la scelta più sicura da
+             quel punto di vista, oltre che più pulita sintatticamente.
+
+════════════════════════════════════════════════════════════════════════════════
+
+HTTP CLIENTS
+════════════════════════════════════════════════════════════════════════════════
+
+Alessandra: Uso Typed Clients con IHttpClientFactory. Niente new HttpClient()
+            e niente Named Clients. Due interfacce separate: IPokeApiClient e
+            ITranslationClient, entrambe internal — sono dettagli implementativi.
+
+Claude Code: Corretto. Per rendere le interfacce internal mockabili con NSubstitute
+             servono due InternalsVisibleTo: uno per il progetto test, uno per
+             DynamicProxyGenAssembly2 — l'assembly dinamico generato da Castle
+             DynamicProxy a runtime.
+
+Alessandra: Giusto, aggiungiamoli.
+
+════════════════════════════════════════════════════════════════════════════════
+
+CACHING ED ERROR HANDLING
+════════════════════════════════════════════════════════════════════════════════
+
+Alessandra: IMemoryCache con TTL diversi: 1h per i dati Pokémon, 24h per le
+            traduzioni per mitigare il rate limit di FunTranslations. Per gli
+            errori uso un GlobalExceptionHandler centralizzato con ProblemDetails
+            RFC 7807.
+
+Claude Code: Tutto condivisibile. Attenzione però a non esporre exception.Message
+             nei 500 — può contenere dettagli interni. I 500 devono restituire
+             un messaggio generico; solo le eccezioni di dominio note come
+             PokemonNotFoundException possono esporre il messaggio.
+
+Alessandra: Ottima osservazione, lo correggiamo subito.
+
+════════════════════════════════════════════════════════════════════════════════
+
+DOCUMENTAZIONE API
+════════════════════════════════════════════════════════════════════════════════
+
+Alessandra: Voglio uno Swagger che si apre all'avvio. Uso Scalar — è il renderer
+            raccomandato per .NET 9+, Microsoft ha abbandonato Swashbuckle come
+            default da questa versione.
+
+Claude Code: Scelta corretta. Microsoft.AspNetCore.OpenApi è built-in in .NET 9,
+             Scalar è il complemento naturale. Meno dipendenze e UI migliore.
+
+════════════════════════════════════════════════════════════════════════════════
+
+BUG: FUNTRANSLATIONS URL ERRATO
+════════════════════════════════════════════════════════════════════════════════
+
+Alessandra: L'endpoint /pokemon/translated restituisce "< is an invalid start
+            of a value" per Pokémon esistenti.
+
+Claude Code: Il dominio root restituisce HTML, non JSON — base URL sbagliato.
+             Leggendo l'OpenAPI spec dell'API: il base URL corretto è
+             https://api.funtranslations.mercxry.me/v1/ e il metodo è POST con
+             body application/x-www-form-urlencoded, non GET.
+             Aggiungo anche un try-catch su JsonException come difesa per risposte
+             HTML inattese con status 200.
+
+════════════════════════════════════════════════════════════════════════════════
+
+DOCKER
+════════════════════════════════════════════════════════════════════════════════
+
+Alessandra: Aggiungiamo il Dockerfile. Multi-stage build: SDK per compilare,
+            runtime leggero per il container finale. L'app gira come utente
+            non-root.
+
+Claude Code: Serve anche un .dockerignore per escludere bin/, obj/ e tests/ —
+             senza di esso i build artifact locali sovrascrivono il restore NuGet
+             dentro il container, causando errori package-not-found al publish.
+
+Alessandra: Aggiungilo.
+
+════════════════════════════════════════════════════════════════════════════════
+
+CODE REVIEW
+════════════════════════════════════════════════════════════════════════════════
+
+Alessandra: Fai una review del progetto rispetto alla consegna.
+
+Claude Code: Requisiti funzionali tutti soddisfatti. Questi i punti che cambierei:
+
+             1. ProducesResponseType mancanti: Scalar mostra gli endpoint ma non
+                lo schema della response.
+             2. Nessuna validazione sull'input: name vuoto arriva al service.
+                Serve un 400 nel controller.
+             3. Base URL hardcodati in Program.cs: meglio in appsettings.json,
+                sovrascrivibili per ambiente senza ricompilare.
+             4. ITranslationClient e TranslationType pubblici: dettagli
+                implementativi, vanno resi internal come IPokeApiClient.
+             5. UseHttpsRedirection sempre attivo: genera warning nei test,
+                va condizionato a !IsDevelopment().
+
+Alessandra: Applicali tutti. Se sistemiamo le cose ora, non serve documentarle
+            come "da fare in produzione" — aggiorna commenti e README di conseguenza.
+            → Tutte le fix applicate. README aggiornato: rimossi i punti risolti,
+              mantenuti solo quelli ancora aperti (Polly, Redis, Observability,
+              rate limiting sull'API).
+
+════════════════════════════════════════════════════════════════════════════════
